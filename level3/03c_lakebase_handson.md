@@ -39,16 +39,40 @@ SELECT * FROM memo;
 
 しばらく操作せずに放置したあと、もう一度クエリを実行してみてください。アイドル中はコンピュートがゼロになっているため、最初の1回だけ起動に数秒かかります。使っていないときにリソースを消費しない仕組みが体感できます。
 
-### 4.(発展)レイクハウスと一緒に使う
+### 4.(発展)Unity Catalogに登録してレイクハウスと一緒に使う
 
-時間に余裕があれば、Catalog ExplorerでLakebaseのデータベースをUnity Catalogに登録してみましょう。登録すると、Databricks SQLからLakebaseのテーブルを、レイクハウスのDeltaテーブルと一緒にJOINできるようになります。「運用データ」と「分析データ」を1つのクエリで扱える、というLakebaseの価値が見えてきます。
+Step2でLakebaseに作ったテーブルをUnity Catalogに登録すると、Databricks SQLからレイクハウスのDeltaテーブルと同じSQLでクエリできるようになります。「運用データ(Lakebase)」と「分析データ(レイクハウス)」を1つの場所で扱える、というLakebaseの価値が見えるところです。
+
+前提:
+
+- メタストアへの `CREATE CATALOG` 権限
+- クエリ用のサーバーレスSQLウェアハウス(Free Editionで1つ使えます)
+
+登録はLakebaseの画面ではなく、Catalog Explorerから行う点に注意してください。
+
+1. アプリスイッチャーで「Lakehouse」に移動する
+2. Catalog Explorerでプラスアイコンをクリックし、「カタログを作成」を選ぶ
+3. カタログ名を入力する(例: `lakebase_catalog`)
+4. カタログタイプで「Lakebase Postgres」を選び、「Autoscaling」を選ぶ
+5. プロジェクト・ブランチ・Postgresデータベースを選ぶ
+6. 「作成」をクリックする
+
+登録すると、Step2で作った memo テーブルが `lakebase_catalog.public.memo` のようにDatabricks SQLから見えます。作られるカタログは読み取り専用で、データの変更はLakebase側(SQLエディタ)で行います。
+
+```sql
+SELECT * FROM lakebase_catalog.public.memo;
+```
+
+このカタログは通常のUnity Catalogテーブルと同じように扱えるので、共通キーがあればレイクハウスのDeltaテーブルと同じSQL内でJOINできます。運用データと分析データをAPI連携なしで突き合わせられるのが狙いどころです。
+
+メタデータの反映に1点注意です。Unity Catalogはメタデータをキャッシュするため、Lakebaseで作ったばかりのテーブルがカタログにすぐ現れないことがあります。その場合はスキーマの更新(リフレッシュ)をクリックして再取得してください。
 
 ## 運営がデモで見せたいポイント
 
 - スケールトゥーゼロの挙動(アイドル→初回クエリの待ち)
 - ブランチを切って隔離した環境で試す流れ
 - AIエージェントの記憶ストアとして使うユースケース(LangGraphとの組み合わせ)
-- レイクハウスのテーブルをLakebaseにsyncして低レイテンシで参照する流れ
+- 逆方向の同期テーブル(UC→Lakebase): レイクハウスのテーブルをLakebaseに同期して低レイテンシで参照する流れ(Step4のUC登録はLakebase→UCで向きが逆)
 
 ## 注意
 
